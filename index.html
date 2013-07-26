@@ -1,0 +1,418 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset=utf-8 />
+
+<!-- Website Design By: www.happyworm.com -->
+<title>Demo : jPlayer Android Fix</title>
+<meta http-equiv="Content-Type" content="text/html; charset=iso-8859-1" />
+<meta name="description" content="The CSS styleable jQuery media player plugin with HTML5 support!" />
+<meta name="keywords" content="jPlayer, jQuery, jQuery plugin, media, video, audio, media player, video player, audio player, mp3, mp4, m4a, m4v, aac, h264, ogg, oga, ogv, wav, webm" />
+<meta name="company" content="Happyworm" />
+<link href="jPlayer.css" rel="stylesheet" type="text/css" />
+<link rel="shortcut icon" href="/graphics/jplayer.ico" type="image/x-icon" />
+<!--[if lt IE 9]>
+  <script src="http://html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+<![endif]-->
+<!--[if IE 6]>
+<link href="/css/ie6.css" rel="stylesheet" type="text/css" />
+<![endif]-->
+<link href="prettify-jPlayer.css" rel="stylesheet" type="text/css" />
+<link href="jplayer.blue.monday.css" rel="stylesheet" type="text/css" />
+<script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js"></script>
+<script type="text/javascript" src="jquery.jplayer.min.js"></script>
+<script type="text/javascript" src="jquery.jplayer.inspector.js"></script>
+<script type="text/javascript" src="themeswitcher.js"></script>
+<script type="text/javascript">
+//<![CDATA[
+
+// TMP For testing on standard browsers.
+// $.jPlayer.platform.android = true;
+
+var jPlayerAndroidFix = (function($) {
+	var fix = function(id, media, options) {
+		this.playFix = false;
+		this.init(id, media, options);
+	};
+	fix.prototype = {
+		init: function(id, media, options) {
+			var self = this;
+
+			// Store the params
+			this.id = id;
+			this.media = media;
+			this.options = options;
+
+			// Make a jQuery selector of the id, for use by the jPlayer instance.
+			this.player = $(this.id);
+
+			// Make the ready event to set the media to initiate.
+			this.player.bind($.jPlayer.event.ready, function(event) {
+				// Use this fix's setMedia() method.
+				self.setMedia(self.media);
+			});
+
+			// Apply Android fixes
+			if($.jPlayer.platform.android) {
+
+				// Fix playing new media immediately after setMedia.
+				this.player.bind($.jPlayer.event.progress, function(event) {
+					if(self.playFixRequired) {
+						self.playFixRequired = false;
+
+						// Enable the contols again
+						// self.player.jPlayer('option', 'cssSelectorAncestor', self.cssSelectorAncestor);
+
+						// Play if required, otherwise it will wait for the normal GUI input.
+						if(self.playFix) {
+							self.playFix = false;
+							$(this).jPlayer("play");
+						}
+					}
+				});
+				// Fix missing ended events.
+				this.player.bind($.jPlayer.event.ended, function(event) {
+					if(self.endedFix) {
+						self.endedFix = false;
+						setTimeout(function() {
+							self.setMedia(self.media);
+						},0);
+						// what if it was looping?
+					}
+				});
+				this.player.bind($.jPlayer.event.pause, function(event) {
+					if(self.endedFix) {
+						var remaining = event.jPlayer.status.duration - event.jPlayer.status.currentTime;
+						if(event.jPlayer.status.currentTime === 0 || remaining < 1) {
+							// Trigger the ended event from inside jplayer instance.
+							setTimeout(function() {
+								self.jPlayer._trigger($.jPlayer.event.ended);
+							},0);
+						}
+					}
+				});
+			}
+
+			// Instance jPlayer
+			this.player.jPlayer(this.options);
+
+			// Store a local copy of the jPlayer instance's object
+			this.jPlayer = this.player.data('jPlayer');
+
+			// Store the real cssSelectorAncestor being used.
+			this.cssSelectorAncestor = this.player.jPlayer('option', 'cssSelectorAncestor');
+
+			// Apply Android fixes
+			this.resetAndroid();
+
+			return this;
+		},
+		setMedia: function(media) {
+			this.media = media;
+
+			// Apply Android fixes
+			this.resetAndroid();
+
+			// Set the media
+			this.player.jPlayer("setMedia", this.media);
+			return this;
+		},
+		play: function() {
+			// Apply Android fixes
+			if($.jPlayer.platform.android && this.playFixRequired) {
+				// Apply Android play fix, if it is required.
+				this.playFix = true;
+			} else {
+				// Other browsers play it, as does Android if the fix is no longer required.
+				this.player.jPlayer("play");
+			}
+		},
+		resetAndroid: function() {
+			// Apply Android fixes
+			if($.jPlayer.platform.android) {
+				this.playFix = false;
+				this.playFixRequired = true;
+				this.endedFix = true;
+				// Disable the controls
+				// this.player.jPlayer('option', 'cssSelectorAncestor', '#NeverFoundDisabled');
+			}
+		}
+	};
+	return fix;
+})(jQuery);
+
+$(document).ready(function() {
+
+	var id = "#jquery_jplayer_1";
+
+	var bubble = {
+		mp3:"http://www.jplayer.org/audio/mp3/Miaow-07-Bubble.mp3",
+		oga:"http://www.jplayer.org/audio/ogg/Miaow-07-Bubble.ogg"
+	};
+	var lismore = {
+		mp3:"http://www.jplayer.org/audio/mp3/Miaow-04-Lismore.mp3",
+		oga:"http://www.jplayer.org/audio/ogg/Miaow-04-Lismore.ogg"
+	};
+
+	var options = {
+		swfPath: "../js",
+		supplied: "mp3,oga",
+		wmode: "window",
+		smoothPlayBar: true,
+		keyEnabled: true
+	};
+
+	var myAndroidFix = new jPlayerAndroidFix(id, bubble, options);
+
+	$('#setMedia-Bubble').click(function() {
+		myAndroidFix.setMedia(bubble);
+		$('.jp-title ul li').text('Bubble');
+	});
+	$('#setMedia-Bubble-play').click(function() {
+		myAndroidFix.setMedia(bubble).play();
+		$('.jp-title ul li').text('Bubble');
+	});
+
+	$('#setMedia-Lismore').click(function() {
+		myAndroidFix.setMedia(lismore);
+		$('.jp-title ul li').text('Lismore');
+	});
+	$('#setMedia-Lismore-play').click(function() {
+		myAndroidFix.setMedia(lismore).play();
+		$('.jp-title ul li').text('Lismore');
+	});
+
+
+	$("#jplayer_inspector").jPlayerInspector({jPlayer:$("#jquery_jplayer_1")});
+});
+//]]>
+</script>
+<script type="text/javascript">
+(function() {
+	var s = document.createElement('script'), t = document.getElementsByTagName('script')[0];
+	s.type = 'text/javascript';
+	s.async = true;
+	s.src = 'http://api.flattr.com/js/0.6/load.js?mode=auto';
+	t.parentNode.insertBefore(s, t);
+})();
+</script>
+<script type="text/javascript">
+	var _gaq = _gaq || [];
+	_gaq.push(['_setAccount', 'UA-3557377-9']);
+	_gaq.push(['_trackPageview']);
+
+	(function() {
+	var ga = document.createElement('script'); ga.type = 'text/javascript'; ga.async = true;
+	ga.src = ('https:' == document.location.protocol ? 'https://ssl' : 'http://www') + '.google-analytics.com/ga.js';
+	var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(ga, s);
+	})();
+</script>
+</head>
+<body class="demo" onload="prettyPrint();">
+<div id="container">
+
+	<header>
+	<a href="/"><img src="/graphics/jplayer_logo.gif" alt="jPlayer" /><h1>HTML5 Audio & Video for jQuery</h1></a>
+
+		<p><a href="http://www.happyworm.com" title="a project by happyworm">a project by happyworm</a></p>
+		<nav class="main">
+			<ul>
+				<li id="home"><a href="/">home</a></li>
+				<li id="demos"><a href="/latest/demos/">demos</a></li>
+				<li id="download"><a href="/download/">download</a></li>
+				<li id="dev_guide"><a href="/latest/developer-guide/">dev guide</a></li>
+				<li id="support"><a href="/support/">support</a></li>
+				<li id="sites"><a href="/sites/">sites</a></li>
+				<li id="about"><a href="/about/">about</a></li>
+				<!-- <li id="skins"><a href="/skins/">skins</a></li> -->
+			</ul>
+		</nav>
+
+	</header>
+	
+	<div id="content_main">
+	<nav>
+			<ul id="breadcrumbs">
+				<li><a href="../demos/">demos (jPlayer 2.3.0)</a></li>
+				<li>> jPlayer Android Fix</li>
+			</ul>
+	</nav>
+		<section>
+			<h2>jPlayer Android Fix</h2>
+
+			<p>This demo investigates the problems with Android 2.3 implementation of the HTML5 Media Spec.</p>
+			<p style="margin-bottom:0;">Issues addressed:</p>
+			<ul>
+				<li>
+					Missing ended events.
+				</li>
+				<li>
+					Failure when <code class="prettyprint">setMedia</code> is followed by <code class="prettyprint">play</code>.
+				</li>
+				<li>
+					Failure when the media has finished playing.
+					<span class="note">The audio that was just playing is corrupted by it ending.</span>
+				</li>
+			</ul>
+			<p style="margin-top:1em; margin-bottom:0;">Issues remaining:</p>
+			<ul>
+				<li>
+					Quickly pressing play on the GUI after changing media causes a failure.
+					<span class="note">Pressing pause again and waiting will cause the media to reset through the ended event fix.</span>
+				</li>
+			</ul>
+
+			<p style="margin-top:1em;">
+				View the source of this page to see the <code class="prettyprint">jPlayerAndroidFix(id, media, options)</code> class, which has been made as a wrapper to jPlayer.
+				The <code class="prettyprint">id</code> is the CSS selector of the jPlayer div.
+				The <code class="prettyprint">media</code> is the media object given in the ready event's setMedia command.
+				The <code class="prettyprint">options</code> are the usual jPlayer options, except that you should not give a ready event handler.
+			</p>
+<pre class="prettyprint linenums">
+var id = "#jquery_jplayer_1";
+var media = {
+	mp3:"http://www.jplayer.org/audio/mp3/Miaow-07-Bubble.mp3",
+	oga:"http://www.jplayer.org/audio/ogg/Miaow-07-Bubble.ogg"
+};
+var options = {
+	swfPath: "/my/swf/path",
+	supplied: "mp3,oga",
+	wmode: "window",
+	smoothPlayBar: true,
+	keyEnabled: true
+};
+var myFix = new jPlayerAndroidFix(id, media, options);
+</pre>
+			<p>
+				Use the controls below to change the media, or to change and play the media.
+			</p>
+			<p>
+				<code class="prettyprint">myFix.setMedia(<a id="setMedia-Bubble" href="javascript:;">Bubble</a>).<a id="setMedia-Bubble-play" href="javascript:;">play</a>()</code>
+				|
+				<code class="prettyprint">myFix.setMedia(<a id="setMedia-Lismore" href="javascript:;">Lismore</a>).<a id="setMedia-Lismore-play" href="javascript:;">play</a>()</code>
+			</p>
+			<p>Press play to start the media.</p>
+
+
+
+		<div id="jquery_jplayer_1" class="jp-jplayer"></div>
+
+		<div id="jp_container_1" class="jp-audio">
+			<div class="jp-type-single">
+				<div class="jp-gui jp-interface">
+					<ul class="jp-controls">
+						<li><a href="javascript:;" class="jp-play" tabindex="1">play</a></li>
+						<li><a href="javascript:;" class="jp-pause" tabindex="1">pause</a></li>
+						<li><a href="javascript:;" class="jp-stop" tabindex="1">stop</a></li>
+						<li><a href="javascript:;" class="jp-mute" tabindex="1" title="mute">mute</a></li>
+						<li><a href="javascript:;" class="jp-unmute" tabindex="1" title="unmute">unmute</a></li>
+						<li><a href="javascript:;" class="jp-volume-max" tabindex="1" title="max volume">max volume</a></li>
+					</ul>
+					<div class="jp-progress">
+						<div class="jp-seek-bar">
+							<div class="jp-play-bar"></div>
+						</div>
+					</div>
+					<div class="jp-volume-bar">
+						<div class="jp-volume-bar-value"></div>
+					</div>
+					<div class="jp-time-holder">
+						<div class="jp-current-time"></div>
+						<div class="jp-duration"></div>
+
+						<ul class="jp-toggles">
+							<li><a href="javascript:;" class="jp-repeat" tabindex="1" title="repeat">repeat</a></li>
+							<li><a href="javascript:;" class="jp-repeat-off" tabindex="1" title="repeat off">repeat off</a></li>
+						</ul>
+					</div>
+				</div>
+				<div class="jp-title">
+					<ul>
+						<li>Bubble</li>
+					</ul>
+				</div>
+				<div class="jp-no-solution">
+					<span>Update Required</span>
+					To play the media you will need to either update your browser to a recent version or update your <a href="http://get.adobe.com/flashplayer/" target="_blank">Flash plugin</a>.
+				</div>
+			</div>
+		</div>
+
+			<div id="jplayer_inspector"></div>
+			<p class="media-copyright">Media used in demo: &copy; 2003 Miaow / Arnaud Laflaquiere - <a href="http://www.miaowmusic.com" target="_blank">MiaowMusic.com</a></p>
+			<p id="console"></p>
+		</section>
+	</div>
+	<aside>
+
+		<div class="section highlight">
+			<h2>Theme Switcher</h2>
+			<p>Try another theme.</p>
+			<select id="themeswitcher">
+				<option value="0" selected="selected">Blue Monday</option>
+				<option value="1">Pink Flag</option>
+			</select>
+		</div>
+			<div class="section highlight">
+			<h2><a href="https://groups.google.com/forum/#!forum/jplayer">jPlayer Community</a></h2>
+				<p>4866 members and counting!</p>
+				<form action="http://groups.google.com/group/jplayer/boxsubscribe">
+					<input type="text" name="email" value="your email" class="placeholder" onfocus="javascript:if(this.value==='your email'){this.value='';this.style.color='#333';}" onblur="javascript:if(this.value===''){this.value='your email';this.style.color='#999';}"/>
+					<input type="submit" value="join" class="btn" />
+				</form>
+		</div>
+
+		<div class="section highlight">
+			<h2>Hire Us!</h2>
+			<p>Need a media based solution realized or just need some help. Hire <a href="http://www.happyworm.com">Happyworm</a>!<br />
+			Contact: <a href="mailto:hire.us@happyworm.com" alt="Hire Happyworm" title="Hire Happyworm">hire.us@happyworm.com</a>.</p>
+		</div>
+
+				<div class="section highlight">
+			<h2>Help us improve jPlayer</h2>
+			<p>Developing and supporting jPlayer is almost a full-time job and we are really just beginning. Help us continue to help you.</p>
+				<form action="https://www.paypal.com/cgi-bin/webscr" method="post"><input type="hidden" name="cmd" value="_s-xclick" /><input type="hidden" name="hosted_button_id" value="5356703" /><input type="image" src="http://www.paypal.com/en_US/i/btn/btn_donate_LG.gif" name="submit" alt="PayPal - The safer, easier way to pay online." /><img alt="" border="0" src="https://www.paypal.com/en_GB/i/scr/pixel.gif" width="1" height="1" /><a class="FlattrButton" style="display:none;" rev="flattr;button:compact;" href="http://www.jplayer.org"></a></form>
+		</div>
+
+		<!--<div class="section highlight">
+			<h2><a href="http://jplayer.it">jPlayer.it</a></h2>
+			<p>Customize your player!</p>
+		</div>-->
+
+		<div class="section  highlight">
+			<h2>Plugin corner</h2>
+			<ul>
+				<li><a href="http://wordpress.org/extend/plugins/mp3-jplayer/">Wordpress</a></li>
+				<li><a href="http://drupal.org/project/jplayer">Drupal</a></li>
+				<li><a href="/sites/#jPlayer-plugin-sites">more...</a></li>
+			</ul>
+		</div>
+		<div class="section ralign">
+		<a href='https://developer.mozilla.org/en/JavaScript/' title='JavaScript Reference and Guide'><img src='/graphics/betterJS.gif' alt='JavaScript Reference and Guide'/></a>
+		</div>
+		<div class="section transbgr">
+			<h3>Also by <a href="http://www.happyworm.com">Happyworm</a>:</h3>
+			<h2><a href="http://www.happyworm.com/projects/Qwiiz/qwiiz-massively-multiplayer-quiz-game.htm">Qwiiz</a></h2>
+			<p>Massively multiplayer real-time quiz game. Cross platform and tuned for the iPad. <a href="http://www.happyworm.com/projects/Qwiiz/qwiiz-massively-multiplayer-quiz-game.htm">Try it!</a></p>
+			
+			<!--<h2><a href="http://openmediaweb.eu/2011/09/27/html5-audio-video-course/">W3C HTML5 Audio and Video Training</a></h2>
+			<p>Want to learn more about HTML5 Audio and Video? Find out what's going on under the hood and learn about the issues and full potential of web based media?</p>
+			<p>Learn tips, tricks and how to create stunning HTML5 media based applications, from the guys that made jPlayer.</p> 
+			<p>You'll find out about browser differences, server configuration, media encoding and how to push the limits of this new and exciting technology.</p>
+			<p>Limited places available.</p>
+			<p><strong><a href="http://openmediaweb.eu/2011/09/27/html5-audio-video-course/">Sign up now!</a></strong></p>-->
+		</div>
+
+	</aside>
+	<footer>
+		<p>
+			<a href="http://www.happyworm.com"><img src="/graphics/worm.jpg" />&copy; 2009 - 2013 Happyworm Ltd</a> - Last update: 19th July 2012		</p>
+		<a href="http://www.w3.org/html/logo/"><img src="http://www.w3.org/html/logo/badge/html5-badge-h-css3-semantics.png" width="165" height="64" alt="HTML5 Powered with CSS3 / Styling, and Semantics" title="HTML5 Powered with CSS3 / Styling, and Semantics"></a>
+		<a id="twitter" href="http://twitter.com/jPlayerOrg"><img alt="twitter" src="/graphics/twitter_small.png"/> follow us on twitter </a>
+	</footer>
+</div>
+</body>
+<script type="text/javascript" src="prettify-jPlayer.js"></script>
+
+</html>
